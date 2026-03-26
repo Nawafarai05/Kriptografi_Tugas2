@@ -9,7 +9,7 @@ def bits_to_string(bits):
     chars = [bits[i:i+8] for i in range(0, len(bits), 8)]
     return ''.join(chr(int(char,2)) for char in chars)
 
-# embedding pesan ke dalam video
+# embedding pesan ke dalam video secara sequential
 def embed_video(input_video, output_video, message) :
     capture = cv2.VideoCapture(input_video)
 
@@ -58,7 +58,7 @@ def embed_video(input_video, output_video, message) :
     if total_bits > max_capacity : 
         print("Kapasitas berlebih!")
     else :
-        print("Embeding selesai!")
+        print("(Sequencial) Embeding selesai!")
 
 # mengekstrak video 
 def extract_video(stego_video) :
