@@ -3,6 +3,12 @@ import numpy as np
 import random
 from test_video import string_to_bits, bits_to_string, set_n_lsb, get_n_lsb
 
+def key_to_seed(key) :
+    seed = 0
+    for char in key :
+        seed = seed * 31 + ord(char)
+    return seed
+    
 def get_pixels(idx, width) :
     i = idx // width
     j = idx % width
@@ -55,7 +61,7 @@ def embed_video_random(input_video, output_video, message, stego_key, scheme) :
             break
 
     # embeding pesan secara random berdasarkan seed dari stego key
-    random.seed(stego_key)
+    random.seed(key_to_seed(stego_key))
 
     indices = random.sample(
         range(4, total_pixels),  # bagian header diskip, dan pesan dimasukkan ke pixel setelah header
@@ -130,7 +136,7 @@ def extract_video_random(stego_video, stego_key, scheme) :
         raise ValueError("Header rusak!")
 
     # mengambil random pesan
-    random.seed(stego_key)
+    random.seed(key_to_seed(stego_key))
 
     indices = random.sample(range(4, total_pixels), length // 8)
 
@@ -153,7 +159,7 @@ if __name__ == "__main__":
     input_video = "input.avi"
     output_video = "output_random.avi"
     message = "TESTING TESTING RANDOM!!"
-    key = 12345
+    key = input("Masukkan key : ")
     scheme_input = input("Scheme (contoh 3,3,2): ")
     scheme = tuple(map(int, scheme_input.split(',')))
 
