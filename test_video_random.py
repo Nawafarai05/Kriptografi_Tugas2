@@ -9,8 +9,10 @@ def get_pixels(idx, width) :
     return i, j
 
 # embedding pesan ke dalam video secara random berdasarkan seeds dari stego key
-def embed_video_random(input_video, output_video, message, stego_key) :
+def embed_video_random(input_video, output_video, message, stego_key, scheme) :
     capture = cv2.VideoCapture(input_video)
+
+    r_n, g_n, b_n = scheme
 
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -38,13 +40,13 @@ def embed_video_random(input_video, output_video, message, stego_key) :
             if idx + 8 <= 32 :
                 chunk = length_bits[idx:idx+8]
                 
-                r_bits = chunk[0:3]
-                g_bits = chunk[3:6]
-                b_bits = chunk[6:8]
+                r_bits = chunk[0:r_n]
+                g_bits = chunk[r_n:r_n + g_n]
+                b_bits = chunk[r_n + g_n:r_n + g_n + b_n]
 
-                frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
-                frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
-                frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+                frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, r_n)
+                frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, g_n)
+                frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, b_n)
 
                 idx += 8
             else :
@@ -67,13 +69,13 @@ def embed_video_random(input_video, output_video, message, stego_key) :
 
         chunk = message_bits[bit_idx:bit_idx + 8]
 
-        r_bits = chunk[0:3]
-        g_bits = chunk[3:6]
-        b_bits = chunk[6:8]
+        r_bits = chunk[0:r_n]
+        g_bits = chunk[r_n:r_n + g_n]
+        b_bits = chunk[r_n + g_n:r_n + g_n + b_n]
         
-        frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
-        frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
-        frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+        frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, r_n)
+        frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, g_n)
+        frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, b_n)
 
         bit_idx += 8
 
@@ -92,12 +94,14 @@ def embed_video_random(input_video, output_video, message, stego_key) :
     print("(Random) Embedding pesan selesai!")
 
 # mengekstrak pesan dari video hasil stego random
-def extract_video_random(stego_video, stego_key) :
+def extract_video_random(stego_video, stego_key, scheme) :
     capture = cv2.VideoCapture(stego_video)
 
     ret, frame = capture.read()
     if not ret:
         raise ValueError("Video kosong!")
+    
+    r_n, g_n, b_n = scheme
 
     h, w, _ = frame.shape
     total_pixels = h * w
@@ -107,9 +111,9 @@ def extract_video_random(stego_video, stego_key) :
     idx = 0
     for i in range(h):
         for j in range(w):
-            r_bits = get_n_lsb(frame[i, j][0], 3)
-            g_bits = get_n_lsb(frame[i, j][1], 3)
-            b_bits = get_n_lsb(frame[i, j][2], 2)
+            r_bits = get_n_lsb(frame[i, j][0], r_n)
+            g_bits = get_n_lsb(frame[i, j][1], g_n)
+            b_bits = get_n_lsb(frame[i, j][2], b_n)
 
             bits += r_bits + g_bits + b_bits
             idx += 8
@@ -134,9 +138,9 @@ def extract_video_random(stego_video, stego_key) :
     for idx in indices:
         i, j = get_pixels(idx, w, )
         
-        r_bits = get_n_lsb(frame[i, j][0], 3)
-        g_bits = get_n_lsb(frame[i, j][1], 3)
-        b_bits = get_n_lsb(frame[i, j][2], 2)
+        r_bits = get_n_lsb(frame[i, j][0], r_n)
+        g_bits = get_n_lsb(frame[i, j][1], g_n)
+        b_bits = get_n_lsb(frame[i, j][2], b_n)
 
         message_bits += r_bits + g_bits + b_bits
 
@@ -150,8 +154,10 @@ if __name__ == "__main__":
     output_video = "output_random.avi"
     message = "TESTING TESTING RANDOM!!"
     key = 12345
+    scheme_input = input("Scheme (contoh 3,3,2): ")
+    scheme = tuple(map(int, scheme_input.split(',')))
 
-    embed_video_random(input_video, output_video, message, key)
+    embed_video_random(input_video, output_video, message, key, scheme)
 
-    result = extract_video_random(output_video, key)
+    result = extract_video_random(output_video, key, scheme)
     print("Extracted : ", result)

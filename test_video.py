@@ -19,7 +19,7 @@ def get_n_lsb(value, n) :
     return format(value & ((1 << n) - 1), f'0{n}b')
 
 # embedding pesan ke dalam video secara sequential
-def embed_video(input_video, output_video, message) :
+def embed_video(input_video, output_video, message, scheme) :
     capture = cv2.VideoCapture(input_video)
 
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -30,6 +30,8 @@ def embed_video(input_video, output_video, message) :
     fourcc = cv2.VideoWriter_fourcc(*'HFYU')
     out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 
+    r_n, g_n, b_n = scheme
+
     # mengubah message jadi bits
     message_bits = string_to_bits(message)
     length_bits = format(len(message_bits), '032b')
@@ -37,7 +39,6 @@ def embed_video(input_video, output_video, message) :
 
     total_bits = len(full_bits)
     bit_idx = 0
-
     max_capacity = 0
 
     while True:
@@ -53,15 +54,16 @@ def embed_video(input_video, output_video, message) :
                 if bit_idx + 8 <= total_bits :
                     chunk = full_bits[bit_idx:bit_idx + 8]
 
-                    r_bits = chunk[0:3]
-                    g_bits = chunk[3:6]
-                    b_bits = chunk[6:8]
+                    r_bits = chunk[0:r_n]
+                    g_bits = chunk[r_n:r_n + g_n]
+                    b_bits = chunk[r_n + g_n:r_n + g_n + b_n]
 
-                    frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
-                    frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
-                    frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+                    frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, r_n)
+                    frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, g_n)
+                    frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, b_n)
 
                     bit_idx += 8
+
                 if bit_idx >= total_bits :
                     break
 
@@ -70,6 +72,7 @@ def embed_video(input_video, output_video, message) :
     capture.release()
     out.release()
 
+    print("Scheme digunakan: ", scheme)
     print("Total capacity:", max_capacity, "bits")
     print("Message size:", total_bits, "bits")
 
@@ -79,8 +82,10 @@ def embed_video(input_video, output_video, message) :
         print("(Sequencial) Embeding selesai!")
 
 # mengekstrak video 
-def extract_video(stego_video) :
+def extract_video(stego_video, scheme) :
     capture = cv2.VideoCapture(stego_video)
+
+    r_n, g_n, b_n = scheme
 
     bits = ""
     length = None
@@ -95,9 +100,9 @@ def extract_video(stego_video) :
 
         for i in range(height) :
             for j in range(width) :
-                r_bits = get_n_lsb(frame[i, j][0], 3)
-                g_bits = get_n_lsb(frame[i, j][1], 3)
-                b_bits = get_n_lsb(frame[i, j][2], 2)
+                r_bits = get_n_lsb(frame[i, j][0], r_n)
+                g_bits = get_n_lsb(frame[i, j][1], g_n)
+                b_bits = get_n_lsb(frame[i, j][2], b_n)
 
                 bits += r_bits + g_bits + b_bits
 
@@ -124,8 +129,10 @@ if __name__ == "__main__":
     input_video = "input.avi"
     output_video = "output.avi"
     message = "Ini dia hasil dari stegovideo anjay anjay anjay!"
+    scheme_input = input("Scheme (contoh 3,3,2): ")
+    scheme = tuple(map(int, scheme_input.split(',')))
 
-    embed_video(input_video, output_video, message)
+    embed_video(input_video, output_video, message, scheme)
 
-    result = extract_video(output_video)
+    result = extract_video(output_video, scheme)
     print("Extracted message :", result)
