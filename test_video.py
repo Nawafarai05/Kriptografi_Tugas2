@@ -9,6 +9,15 @@ def bits_to_string(bits):
     chars = [bits[i:i+8] for i in range(0, len(bits), 8)]
     return ''.join(chr(int(char,2)) for char in chars)
 
+def set_n_lsb(value, bits, n) :
+    mask = (1 << n) - 1
+    value = value & (255 - mask)
+    value = value | int(bits, 2)
+    return value
+
+def get_n_lsb(value, n) :
+    return format(value & ((1 << n) - 1), f'0{n}b')
+
 # embedding pesan ke dalam video secara sequential
 def embed_video(input_video, output_video, message) :
     capture = cv2.VideoCapture(input_video)
@@ -37,15 +46,24 @@ def embed_video(input_video, output_video, message) :
             break
 
         height, width, _ = frame.shape
-        max_capacity += height * width * 3
+        max_capacity += height * width * 8
 
         for i in range(height) :
             for j in range(width) :
-                for k in range(3) :
-                    if bit_idx < total_bits :
-                        bit = int(full_bits[bit_idx])
-                        frame[i, j][k] = (frame[i, j][k] & 254) | bit
-                        bit_idx += 1
+                if bit_idx + 8 <= total_bits :
+                    chunk = full_bits[bit_idx:bit_idx + 8]
+
+                    r_bits = chunk[0:3]
+                    g_bits = chunk[3:6]
+                    b_bits = chunk[6:8]
+
+                    frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
+                    frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
+                    frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+
+                    bit_idx += 8
+                if bit_idx >= total_bits :
+                    break
 
         out.write(frame)
 
@@ -77,23 +95,26 @@ def extract_video(stego_video) :
 
         for i in range(height) :
             for j in range(width) :
-                for k in range(3) :
-                    bits += str(frame[i, j][k] & 1)
+                r_bits = get_n_lsb(frame[i, j][0], 3)
+                g_bits = get_n_lsb(frame[i, j][1], 3)
+                b_bits = get_n_lsb(frame[i, j][2], 2)
 
-                    # mengambil panjang pesan 32 bit
-                    if length is None and len(bits) >= 32:
-                        length = int(bits[:32], 2)
-                        total_needed = 32 + length
-                        print("DEBUG length :", length)
+                bits += r_bits + g_bits + b_bits
 
-                    # kalau sudah, distop
-                    if total_needed is not None and len(bits) >= total_needed:
-                        capture.release()
+                # mengambil panjang pesan 32 bit
+                if length is None and len(bits) >= 32:
+                    length = int(bits[:32], 2)
+                    total_needed = 32 + length
+                    print("DEBUG length :", length)
 
-                        message_bits = bits[32:32+length]
-                        message_bits = message_bits[:len(message_bits)//8 * 8]
+                # kalau sudah, distop
+                if total_needed is not None and len(bits) >= total_needed:
+                    capture.release()
 
-                        return bits_to_string(message_bits)
+                    message_bits = bits[32:32+length]
+                    message_bits = message_bits[:len(message_bits)//8 * 8]
+
+                    return bits_to_string(message_bits)
 
     capture.release()
     return ""

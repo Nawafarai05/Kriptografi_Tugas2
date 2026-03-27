@@ -1,14 +1,12 @@
 import cv2
 import numpy as np
 import random
-from test_video import string_to_bits, bits_to_string
+from test_video import string_to_bits, bits_to_string, set_n_lsb, get_n_lsb
 
-def get_positions(idx, width, height) :
-    pixel_idx = idx // 3
-    k = idx % 3
-    i = pixel_idx // width
-    j = pixel_idx % width
-    return i, j, k
+def get_pixels(idx, width) :
+    i = idx // width
+    j = idx % width
+    return i, j
 
 # embedding pesan ke dalam video secara random berdasarkan seeds dari stego key
 def embed_video_random(input_video, output_video, message, stego_key) :
@@ -18,7 +16,7 @@ def embed_video_random(input_video, output_video, message, stego_key) :
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = capture.get(cv2.CAP_PROP_FPS)
 
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    fourcc = cv2.VideoWriter_fourcc(*'HFYU')
     out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 
     # mengubah message menjadi bits
@@ -31,35 +29,53 @@ def embed_video_random(input_video, output_video, message, stego_key) :
         raise ValueError("Video kosong")
     
     h, w, _ = frame.shape
-    total_pixels = h * w * 3
+    total_pixels = h * w
 
     # simpan header sequencial
     idx = 0
     for i in range(h) :
         for j in range(w) :
-            for k in range(3) :
-                if idx < 32 :
-                    frame[i, j][k] = (frame[i, j][k] & 254) | int(length_bits[idx])
-                    idx += 1
-                else :
-                    break
-            if idx >= 32 :
+            if idx + 8 <= 32 :
+                chunk = length_bits[idx:idx+8]
+                
+                r_bits = chunk[0:3]
+                g_bits = chunk[3:6]
+                b_bits = chunk[6:8]
+
+                frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
+                frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
+                frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+
+                idx += 8
+            else :
                 break
         if idx >= 32 :
             break
 
     # embeding pesan secara random berdasarkan seed dari stego key
     random.seed(stego_key)
-    header_size = 32  # 32 bit pertama
 
     indices = random.sample(
-        range(header_size, total_pixels),  # bagian header diskip, dan pesan dimasukkan ke pixel setelah header
-        len(message_bits)
+        range(4, total_pixels),  # bagian header diskip, dan pesan dimasukkan ke pixel setelah header
+        len(message_bits) // 8
     )
 
-    for bit_idx, rand_idx in enumerate(indices) :
-        i, j, k = get_positions(rand_idx, w, h)
-        frame[i, j][k] = (frame[i, j][k] & 254) | int(message_bits[bit_idx])
+    bit_idx = 0
+
+    for idx in indices :
+        i, j = get_pixels(idx, w)
+
+        chunk = message_bits[bit_idx:bit_idx + 8]
+
+        r_bits = chunk[0:3]
+        g_bits = chunk[3:6]
+        b_bits = chunk[6:8]
+        
+        frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, 3)
+        frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, 3)
+        frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, 2)
+
+        bit_idx += 8
 
     out.write(frame)
 
@@ -84,19 +100,20 @@ def extract_video_random(stego_video, stego_key) :
         raise ValueError("Video kosong!")
 
     h, w, _ = frame.shape
-    total_pixels = h * w * 3
+    total_pixels = h * w
 
     # mengambil header secara sequential
     bits = ""
     idx = 0
     for i in range(h):
         for j in range(w):
-            for k in range(3):
-                if idx < 32:
-                    bits += str(frame[i, j][k] & 1)
-                    idx += 1
-                else:
-                    break
+            r_bits = get_n_lsb(frame[i, j][0], 3)
+            g_bits = get_n_lsb(frame[i, j][1], 3)
+            b_bits = get_n_lsb(frame[i, j][2], 2)
+
+            bits += r_bits + g_bits + b_bits
+            idx += 8
+
             if idx >= 32:
                 break
         if idx >= 32:
@@ -110,12 +127,18 @@ def extract_video_random(stego_video, stego_key) :
 
     # mengambil random pesan
     random.seed(stego_key)
-    indices = random.sample(range(total_pixels), length)
+
+    indices = random.sample(range(4, total_pixels), length // 8)
 
     message_bits = ""
     for idx in indices:
-        i, j, k = get_positions(idx, w, h)
-        message_bits += str(frame[i, j][k] & 1)
+        i, j = get_pixels(idx, w, )
+        
+        r_bits = get_n_lsb(frame[i, j][0], 3)
+        g_bits = get_n_lsb(frame[i, j][1], 3)
+        b_bits = get_n_lsb(frame[i, j][2], 2)
+
+        message_bits += r_bits + g_bits + b_bits
 
     message_bits = message_bits[:len(message_bits)//8 * 8]
 
