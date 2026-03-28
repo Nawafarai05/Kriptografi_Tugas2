@@ -140,12 +140,21 @@ def extract_video(stego_video, scheme) :
 
                         file_bits = bits[41 + ext_len : 41 + ext_len + length]
 
-                        output_name = input("Masukkan nama file output (tanpa ekstensi): ")
-                        filename = output_name + extension
-                        bits_to_file(file_bits, filename)
+                        output_folder = "extracted"
+                        os.makedirs(output_folder, exist_ok = True)
+                        output_name = input("Nama file output (tanpa extensi) : ")
+
+                        if output_name == "" :
+                            filename = "extracted" + extension
+                        else :
+                            filename = output_name + extension
+
+                        filepath = os.path.join(output_folder, filename)
+
+                        bits_to_file(file_bits, filepath)
 
                         print("File berhasil diectract : ", filename)
-                        return filename
+                        return filepath
                 
     capture.release()
     return None
