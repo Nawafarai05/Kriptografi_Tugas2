@@ -30,27 +30,42 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme)
     fourcc = cv2.VideoWriter_fourcc(*'HFYU')
     out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 
-    # menentukan mode dalam teks atau berkas file
+    # handling bagian informasi yang akan disimpan dalam header
+    if mode == "text" :
+        mode_bit = "0"
+    else :
+        mode_bit = "1"
+    method_bit = "1" # pada metode LSB random
+    encrypt_bit = "0" # kalau tidak dienkripsi
+    
+    header_prefix = mode_bit + method_bit + encrypt_bit
+
     if mode == "text" :
         data_bits = string_to_bits(data)
-        mode_bit = "0"
-        ext_bits = ""
-        ext_len_bits = "00000000"
+        extra_bits = ""
 
     elif mode == "file" :
         data_bits = file_to_bits(data)
         ext = get_extension(data)
+        filename = os.path.splitext(os.path.basename(data))[0]
+
+        # menyimpan extension file yang disisipkan
         ext_bits = string_to_bits(ext)
         ext_len_bits = format(len(ext_bits), '08b')
-        mode_bit = "1"
+
+        # menyimpan nama file yang disisipkan
+        name_bits = string_to_bits(filename)
+        name_len_bits  = format(len(name_bits), '08b')
+
+        extra_bits = ext_len_bits + ext_bits + name_len_bits + name_bits
 
     else :
         raise ValueError("Mode harus text/file")
     
     length_bits = format(len(data_bits), '032b')
 
-    header_bits = mode_bit + length_bits + ext_len_bits
-    random_bits = ext_bits + data_bits
+    header_bits = header_prefix + length_bits + extra_bits
+    random_bits = data_bits
 
     # mengambil semua frame dari video
     ret, frame = capture.read()
@@ -62,22 +77,26 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme)
 
     # simpan header sequencial
     idx = 0
+    done = False
     for i in range(h) :
         for j in range(w) :
-            if idx + 8 <= len(header_bits):
-                chunk = header_bits[idx:idx+8]
+            if idx >= len(header_bits) :
+                done = True
+                break 
+
+            chunk = header_bits[idx : idx + 8]
+            if len(chunk) < 8:
+                chunk = chunk.ljust(8, '0')
                 
-                r_bits = chunk[0:r_n]
-                g_bits = chunk[r_n:r_n + g_n]
-                b_bits = chunk[r_n + g_n:r_n + g_n + b_n]
+            r_bits = chunk[0:r_n]
+            g_bits = chunk[r_n:r_n + g_n]
+            b_bits = chunk[r_n + g_n:r_n + g_n + b_n]
 
-                frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, r_n)
-                frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, g_n)
-                frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, b_n)
+            frame[i, j][0] = set_n_lsb(frame[i, j][0], r_bits, r_n)
+            frame[i, j][1] = set_n_lsb(frame[i, j][1], g_bits, g_n)
+            frame[i, j][2] = set_n_lsb(frame[i, j][2], b_bits, b_n)
 
-                idx += 8
-            else :
-                break
+            idx += 8
         if idx >= len(header_bits) :
             break
 
@@ -97,7 +116,6 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme)
         i, j = get_pixels(px_idx, w)
 
         chunk = random_bits[bit_idx:bit_idx + 8]
-
         if len(chunk) < 8 :
             chunk = chunk.ljust(8, '0')
 
@@ -143,38 +161,69 @@ def extract_video_random(stego_video, stego_key, scheme) :
 
     # membaca bagian header
     bits = ""
-    idx = 0
+    pixel_idx = 0
 
-    for i in range(h):
-        for j in range(w):
-            r_bits = get_n_lsb(frame[i, j][0], r_n)
-            g_bits = get_n_lsb(frame[i, j][1], g_n)
-            b_bits = get_n_lsb(frame[i, j][2], b_n)
+    def read_next_pixel() :
+        nonlocal pixel_idx
+        i, j = get_pixels(pixel_idx, w)
+        pixel_idx += 1
 
-            bits += r_bits + g_bits + b_bits
+        r_bits = get_n_lsb(frame[i, j][0], r_n)
+        g_bits = get_n_lsb(frame[i, j][1], g_n)
+        b_bits = get_n_lsb(frame[i, j][2], b_n)
 
-            if len(bits) >= 41 :
-                bits = bits[:41]
-                break
-        if len(bits) >=  41 :
-            break
+        return r_bits + g_bits + b_bits
+    
+    while len(bits) < 43 : 
+        bits += read_next_pixel()
 
-    # mengambil bagian header 33 bits pertama
     mode = bits[0]
-    length = int(bits[1:33], 2)
-    ext_len = int(bits[33:41], 2)
-    print("DEBUG length:", length)
+    method = bits[1]
+    encrypt_flag = bits[2]
 
-    start_pixel = 5
+    length = int(bits[3:35], 2)
+    ext_len = int(bits[35:43], 2)
+
+    print("DEBUG mode :", mode)
+    print("DEBUG length:", length)
+    print("DEBUG method :", method)
+
+    # mengambil bagian extension file
+    while len(bits) < 43 + ext_len : 
+        bits += read_next_pixel()
+
+    ext_bits = bits[43 : 43 + ext_len]
+    extension = bits_to_string(ext_bits)
+
+    # mengambil bagian panjang name file
+    while len(bits) < 43 + ext_len + 8 : 
+        bits += read_next_pixel()
+
+    name_len = int(bits[43 + ext_len : 43 + ext_len + 8], 2)
+
+    # mengambil bagian nama file
+    while len(bits) < 43 + ext_len +  8 + name_len :
+        bits += read_next_pixel()
+
+    name_start = 43 + ext_len + 8
+    name_bits = bits[name_start : name_start + name_len]
+    filename = bits_to_string(name_bits)
+
+    print("DEBUG extension :", extension)
+    print("DEBUG filename :", filename)
+
+    total_header = 43 + ext_len + 8 + name_len
 
     # mengekstrak bagian message
+    start_pixel = (total_header + 7) // 8
+
     random.seed(key_to_seed(stego_key))
     all_indices = list(range(start_pixel, total_pixels))
     random.shuffle(all_indices)
 
     message_bits = ""
 
-    indices = all_indices[:(ext_len + length + 7) // 8]
+    indices = all_indices[:(length + 7) // 8]
 
     for px_idx in indices :
         i, j = get_pixels(px_idx, w)
@@ -185,52 +234,37 @@ def extract_video_random(stego_video, stego_key, scheme) :
 
         message_bits += r_bits + g_bits+ b_bits
 
-        # berhenti kalau sudah
-        total_needed = ext_len + length 
-        if len(message_bits) >= 8 :
-            if len(message_bits) >= total_needed:
-                message_bits = message_bits[:total_needed]
-                break
+        if len(message_bits) >= length:
+            message_bits = message_bits[:length]
+            break
 
     # kalau message bentuk text langsung
     if mode == "0" :
         return bits_to_string(message_bits[:length])
 
     # kalau message dalam bentuk berkas file
-    if mode == "1" :
-        ext_bits = message_bits[:ext_len]
-        extension = bits_to_string(ext_bits)
-
-        extension = ''.join(c for c in extension if c.isalnum() or c == '.')
-
-        print("DEBUG extension :", extension)
-
-        file_bits = message_bits[ext_len : ext_len + length]
-        file_bits = file_bits[:length]
-
-        # metode save as extracted file
+    else :
         output_folder = "extracted"
         os.makedirs(output_folder, exist_ok = True)
+
         output_name = input("Nama file output (tanpa extensi) : ")
 
         if output_name == "" :
-            filename = "extracted" + extension
+            filename = filename + extension
         else :
             filename = output_name + extension
 
         filepath = os.path.join(output_folder, filename)
         
-        bits_to_file(file_bits, filepath)
+        bits_to_file(message_bits, filepath)
 
-        print("File berhas" \
-        "il diextract : ", filepath)
+        print("File berhasil diextract : ", filepath)
         return filepath
 
 # testing
 if __name__ == "__main__":
     input_video = "input.avi"
     output_video = "output_random.avi"
-    message = "TESTING TESTING RANDOM!!"
 
     mode = input("Mode (text/file): ")
 
