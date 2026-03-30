@@ -39,3 +39,10 @@ def bits_to_file(bits, output_filename) :
 # mengambil bagian extension berkas file
 def get_extension(filename) :
     return os.path.splitext(filename)[1]
+
+# mengubah bit pesan menjadi byte dan sebalikanya
+def bits_to_bytes(bits) :
+    return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8))
+
+def bytes_to_bits(data) :
+    return ''.join(format(b, '08b') for b in data)
