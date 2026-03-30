@@ -1,6 +1,7 @@
 import cv2
 from converter import *
 import os
+from a5_1 import * 
 
 # embedding pesan ke dalam video secara sequential
 def embed_video(input_video, output_video, data, mode, scheme) :

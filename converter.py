@@ -46,3 +46,14 @@ def bits_to_bytes(bits) :
 
 def bytes_to_bits(data) :
     return ''.join(format(b, '08b') for b in data)
+
+# mengubah key untuk enkripsi ke dalam bit
+def key_to_seed(key) :
+    seed = 0
+    for char in key :
+        seed = seed * 31 + ord(char)
+    return seed
+
+def key_to_64bit(key) :
+    seed = key_to_seed(key)
+    return format(seed, '064b')[:64]

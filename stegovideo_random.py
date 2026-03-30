@@ -4,16 +4,6 @@ import random
 import os
 from converter import *
 from a5_1 import * 
-
-def key_to_seed(key) :
-    seed = 0
-    for char in key :
-        seed = seed * 31 + ord(char)
-    return seed
-
-def key_to_64bit(key) :
-    seed = key_to_seed(key)
-    return format(seed, '064b')[:64]
     
 def get_pixels(idx, width) :
     i = idx // width
@@ -21,7 +11,7 @@ def get_pixels(idx, width) :
     return i, j
 
 # embedding pesan ke dalam video secara random berdasarkan seeds dari stego key
-def embed_video_random(input_video, output_video, data, mode, stego_key, scheme, encrypt) :
+def embed_video_random(input_video, output_video, data, mode, stego_key, scheme, encrypt, enc_key) :
     capture = cv2.VideoCapture(input_video)
 
     r_n, g_n, b_n = scheme
@@ -68,7 +58,7 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme,
         raise ValueError("Mode harus text/file")
 
     if encrypt_bit == "1" :
-        key_bin = key_to_64bit(stego_key)
+        key_bin = key_to_64bit(enc_key)
         data_bytes = encrypt_payload(data_bytes, key_bin)
     
     data_bits = bytes_to_bits(data_bytes)
@@ -157,7 +147,7 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme,
     print("(Random) Embedding pesan selesai!")
 
 # mengekstrak pesan dari video hasil stego random
-def extract_video_random(stego_video, stego_key, scheme) :
+def extract_video_random(stego_video, stego_key, enc_key, scheme) :
     capture = cv2.VideoCapture(stego_video)
 
     ret, frame = capture.read()
@@ -254,7 +244,7 @@ def extract_video_random(stego_video, stego_key, scheme) :
     data_bytes = bits_to_bytes(message_bits)
 
     if encrypt_flag == "1" :
-        key_bin = key_to_64bit(stego_key)
+        key_bin = key_to_64bit(enc_key)
         data_bytes = decrypt_payload(data_bytes, key_bin, len(data_bytes))
 
     # kalau message bentuk text langsung
@@ -296,10 +286,13 @@ if __name__ == "__main__":
     key = input("Masukkan key : ")
     encrypt = input("Pesan ingin dienkripsi? (y/n) : ")
 
+    if encrypt == "y" :
+        enc_key = input("Masukkan kunci enkripsi pesan :")
+
     scheme_input = input("Scheme (contoh 3,3,2): ")
     scheme = tuple(map(int, scheme_input.split(',')))
 
-    embed_video_random(input_video, output_video, data, mode, key, scheme, encrypt)
+    embed_video_random(input_video, output_video, data, mode, key, scheme, encrypt, enc_key)
 
-    result = extract_video_random(output_video, key, scheme)
+    result = extract_video_random(output_video, key, enc_key, scheme)
     print("Extracted : ", result)
