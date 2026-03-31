@@ -103,7 +103,7 @@ def embed_video(input_video, output_video, data, mode, scheme, encrypt, enc_key)
     print("(Sequential) Embedding selesai!")
 
 # mengekstrak video
-def extract_video(stego_video, enc_key, scheme) :
+def extract_video(stego_video, enc_key, scheme, output_name) :
     capture = cv2.VideoCapture(stego_video)
 
     ret, frame = capture.read()
@@ -180,8 +180,6 @@ def extract_video(stego_video, enc_key, scheme) :
     if mode == "0" :
         return data_bytes.decode()
     else :
-        output_name = input("Nama file output (tanpa extensi) : ")
-
         if output_name == "" :
             filename = filename + extension
         else :

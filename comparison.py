@@ -78,8 +78,8 @@ def compare_hist(video1, video2) :
         plot_histogram(frame1, frame2)
 
 if __name__ == "__main__" :
-    original = "input.avi"
-    stego = "output.avi"
+    original = "dummy_files/sample.avi"
+    stego = "sample_txt.avi"
 
     compare_videos(original, stego)
     compare_hist(original, stego)

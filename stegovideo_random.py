@@ -143,7 +143,7 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme,
     print("(Random) Embedding pesan selesai!")
 
 # mengekstrak pesan dari video hasil stego random
-def extract_video_random(stego_video, stego_key, enc_key, scheme) :
+def extract_video_random(stego_video, stego_key, enc_key, scheme, output_name) :
     capture = cv2.VideoCapture(stego_video)
 
     ret, frame = capture.read()
@@ -251,8 +251,6 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
 
     # kalau message dalam bentuk berkas file
     else :
-        output_name = input("Nama file output (tanpa extensi) : ")
-
         if output_name == "" :
             filename = filename + extension
         else :
