@@ -2,10 +2,11 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import re
-from stegovideo_random import embed_video_random, extract_video_random
-from stegovideo_sequential import embed_video, extract_video
+from stegovideo_random import *
+from stegovideo_sequential import *
 from comparison import *
 from converter import *
+from a5_1 import *
 
 # =========================
 # GLOBAL STATE
@@ -34,10 +35,11 @@ def clear_window():
     for widget in root.winfo_children():
         widget.destroy()
 
+# memastikan nama file hanya berisikan karakter yang diperbolehkan dalam windows
 def sanitize_filename(name):
-    # Menghapus karakter yang tidak diperbolehkan dalam nama file Windows
     return "".join(re.findall(r'[a-zA-Z0-9._-]', name))
 
+# mengambil header
 def header_checker(video, scheme) :
     capture = cv2.VideoCapture(video)
 
@@ -72,6 +74,65 @@ def header_checker(video, scheme) :
     encrypt_flag = bits[2]
 
     return mode, method, encrypt_flag
+
+# mengecek ukuran file, memastikan bisa disisipkan
+def check_capacity(input_video, data, mode, scheme, encrypt, enc_key) :
+    # mengambil size data video
+    capture = cv2.VideoCapture(input_video)
+
+    total_pixels = 0
+    total_frames = 0
+
+    while True :
+        ret, frame = capture.read()
+        if not ret :
+            break
+        h, w, _ = frame.shape
+        total_pixels += h * w
+        total_frames += 1
+
+    capture.release()
+
+    capacity_bits = total_pixels * 8
+
+    # mengambil size data yang disisipkan
+    if mode == "text" :
+        data_bytes = data.encode()
+        extra_bits = 0
+    else :
+        data_bytes = open(data, "rb").read()
+
+        ext = get_extension(data)
+        filename = os.path.splitext(os.path.basename(data))[0]
+
+        ext_bits = len(string_to_bits(ext))
+        name_bits = len(string_to_bits(filename))
+
+        extra_bits = 8 + ext_bits + 8 + name_bits
+
+    # menkripsi pesan kalau dienkripsi
+    if encrypt == "y" :
+        key_bin = key_to_64bit(enc_key)
+        data_bytes = encrypt_payload(data_bytes, key_bin)
+    data_bits = len(bytes_to_bits(data_bytes))
+
+    # ukuran heaser
+    base_header = 67
+
+    if mode == "text" :
+        header_bits = base_header
+    else :
+        header_bits = base_header + extra_bits
+    
+    total_needed = header_bits + data_bits
+
+    print("DEBUG video size : ", capacity_bits)
+    print("DEBUG file/text size :", total_needed)
+
+    if total_needed > capacity_bits :
+        raise ValueError("Ukuran video tidak cukup")
+    else :
+        return
 
 # =========================
 # UI SCREENS

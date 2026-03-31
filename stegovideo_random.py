@@ -52,17 +52,18 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme,
     else :
         raise ValueError("Mode harus text/file")
 
-    if encrypt_bit == "1" :
+    if encrypt_bit == "1" and enc_key != "" :
         key_bin = key_to_64bit(enc_key)
         data_bytes = encrypt_payload(data_bytes, key_bin)
     
+    file_size_bits = format(len(data_bytes), '032b')
     data_bits = bytes_to_bits(data_bytes)
     length_bits = format(len(data_bits), '032b')
 
     if mode == "text" :
-        header_bits = header_prefix + length_bits
+        header_bits = header_prefix + length_bits + file_size_bits
     else :
-        header_bits = header_prefix + length_bits + extra_bits
+        header_bits = header_prefix + length_bits + file_size_bits + extra_bits
 
     # mengambil semua frame dari video
     ret, frame = capture.read()
@@ -169,13 +170,14 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
 
         return r_bits + g_bits + b_bits
     
-    while len(bits) < 35 : 
+    while len(bits) < 67 : 
         bits += read_next_pixel()
 
     mode = bits[0]
     method = bits[1]
     encrypt_flag = bits[2]
     length = int(bits[3:35], 2)
+    file_size = int(bits[35:67], 2)
 
     print("DEBUG encrypt flag :", encrypt_flag)
 
@@ -184,33 +186,33 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
     print("DEBUG method :", method)
 
     if mode == "1" :
-        while len(bits) < 43 :
+        while len(bits) < 75 :
             bits += read_next_pixel()
-        ext_len = int(bits[35:43], 2)
+        ext_len = int(bits[67:75], 2)
 
         # mengambil bagian extension file
-        while len(bits) < 43 + ext_len + 8: 
+        while len(bits) < 75 + ext_len + 8: 
             bits += read_next_pixel()
 
-        ext_bits = bits[43 : 43 + ext_len]
+        ext_bits = bits[75 : 75 + ext_len]
         extension = bits_to_string(ext_bits)
 
-        name_len = int(bits[43 + ext_len : 43 + ext_len + 8], 2) # sekalian mengambil panjang dari bit name file
+        name_len = int(bits[75 + ext_len : 75 + ext_len + 8], 2) # sekalian mengambil panjang dari bit name file
 
         # mengambil bagian nama file
-        while len(bits) < 43 + ext_len +  8 + name_len :
+        while len(bits) < 75 + ext_len +  8 + name_len :
             bits += read_next_pixel()
 
-        name_start = 43 + ext_len + 8
+        name_start = 75 + ext_len + 8
         name_bits = bits[name_start : name_start + name_len]
         filename = bits_to_string(name_bits)
 
         print("DEBUG extension :", extension)
         print("DEBUG filename :", filename)
 
-        total_header = 43 + ext_len + 8 + name_len
+        total_header = 75 + ext_len + 8 + name_len
     else :
-        total_header = 35
+        total_header = 67
 
     # mengekstrak bagian message
     start_pixel = (total_header + 7) // 8
@@ -238,9 +240,10 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
 
     data_bytes = bits_to_bytes(message_bits)
 
-    if encrypt_flag == "1" :
+    if encrypt_flag == "1" and enc_key != "" :
         key_bin = key_to_64bit(enc_key)
         data_bytes = decrypt_payload(data_bytes, key_bin, len(data_bytes))
+    data_bytes = data_bytes[:file_size]
 
     # kalau message bentuk text langsung
     if mode == "0" :
@@ -278,6 +281,8 @@ if __name__ == "__main__":
 
     if encrypt == "y" :
         enc_key = input("Masukkan kunci enkripsi pesan :")
+    else :
+        enc_key = 0
 
     scheme_input = input("Scheme (contoh 3,3,2): ")
     scheme = tuple(map(int, scheme_input.split(',')))

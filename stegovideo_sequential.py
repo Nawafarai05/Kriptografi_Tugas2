@@ -51,7 +51,7 @@ def embed_video(input_video, output_video, data, mode, scheme, encrypt, enc_key)
         raise ValueError("Pesan dalam teks langsung atau berksas file")
     
     # proses apabila pesan dienkripsi
-    if encrypt_bit == "1" :
+    if encrypt_bit == "1" and enc_key != "":
         key_bin = key_to_64bit(enc_key)
         data_bytes = encrypt_payload(data_bytes, key_bin)
 
@@ -171,7 +171,7 @@ def extract_video(stego_video, enc_key, scheme) :
     data_bytes = bits_to_bytes(message_bits)
 
     # mendekripsi apabila didekripsi
-    if encrypt_flag == "1" :
+    if encrypt_flag == "1" and enc_key != "":
         key_bin = key_to_64bit(enc_key)
         data_bytes = decrypt_payload(data_bytes, key_bin, len(data_bytes))
     data_bytes = data_bytes[:file_size] # dipotong sesuai ukuran asli file
@@ -209,6 +209,8 @@ if __name__ == "__main__":
 
     if encrypt == "y" :
         enc_key = input("Masukkan kunci enkripsi pesan : ")
+    else :
+        enc_key = ""
 
     scheme_input = input("Scheme (contoh 3,3,2): ")
     scheme = tuple(map(int, scheme_input.split(',')))
