@@ -195,3 +195,5 @@ Aplikasi ini berhasil mengimplementasikan:
 Dengan tingkat keberhasilan ekstraksi yang tinggi dan distorsi minimal.
 
 ---
+
+Sign : task finalize
