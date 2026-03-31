@@ -4,8 +4,8 @@ import os
 import re
 from stegovideo_random import embed_video_random, extract_video_random
 from stegovideo_sequential import embed_video, extract_video
-from comparison import compare_videos
-from converter import bits_to_file
+from comparison import *
+from converter import *
 
 # =========================
 # GLOBAL STATE
@@ -37,6 +37,41 @@ def clear_window():
 def sanitize_filename(name):
     # Menghapus karakter yang tidak diperbolehkan dalam nama file Windows
     return "".join(re.findall(r'[a-zA-Z0-9._-]', name))
+
+def header_checker(video, scheme) :
+    capture = cv2.VideoCapture(video)
+
+    r_n, g_n, b_n = scheme
+
+    bits = ""
+
+    while True :
+        ret, frame = capture.read()
+        if not ret :
+            break
+
+        height, width, _ = frame.shape
+
+        for i in range(height) :
+            for j in range(width) :
+                r_bits = get_n_lsb(frame[i, j][0], r_n)
+                g_bits = get_n_lsb(frame[i, j][1], g_n)
+                b_bits = get_n_lsb(frame[i, j][2], b_n)
+
+                bits += r_bits + g_bits + b_bits
+
+                if len(bits) >= 35 :
+                    break
+            if len(bits) >= 35 :
+                break
+        if len(bits) >= 35 :
+            break
+
+    mode = bits[0]
+    method = bits[1]
+    encrypt_flag = bits[2]
+
+    return mode, method, encrypt_flag
 
 # =========================
 # UI SCREENS

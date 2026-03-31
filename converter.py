@@ -57,3 +57,8 @@ def key_to_seed(key) :
 def key_to_64bit(key) :
     seed = key_to_seed(key)
     return format(seed, '064b')[:64]
+
+def get_pixels(idx, width) :
+    i = idx // width
+    j = idx % width
+    return i, j

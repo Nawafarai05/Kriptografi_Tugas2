@@ -4,11 +4,6 @@ import random
 import os
 from converter import *
 from a5_1 import * 
-    
-def get_pixels(idx, width) :
-    i = idx // width
-    j = idx % width
-    return i, j
 
 # embedding pesan ke dalam video secara random berdasarkan seeds dari stego key
 def embed_video_random(input_video, output_video, data, mode, stego_key, scheme, encrypt, enc_key) :
@@ -31,7 +26,7 @@ def embed_video_random(input_video, output_video, data, mode, stego_key, scheme,
     else :
         mode_bit = "1"
     method_bit = "1" # pada metode LSB random
-    encrypt_bit = "1" if encrypt.lower() == "y" else "0" # kalau tidak dienkripsi
+    encrypt_bit = "1" if encrypt == "y" else "0" # kalau tidak dienkripsi
     
     header_prefix = mode_bit + method_bit + encrypt_bit
 
@@ -253,9 +248,6 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
 
     # kalau message dalam bentuk berkas file
     else :
-        # output_folder = "extracted"
-        # os.makedirs(output_folder, exist_ok = True)
-
         output_name = input("Nama file output (tanpa extensi) : ")
 
         if output_name == "" :
@@ -263,8 +255,6 @@ def extract_video_random(stego_video, stego_key, enc_key, scheme) :
         else :
             filename = output_name + extension
 
-        # filepath = os.path.join(output_folder, filename)
-        
         with open(filename, "wb") as f :
             f.write(data_bytes)
 
